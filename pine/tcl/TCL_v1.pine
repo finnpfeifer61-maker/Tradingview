@@ -1,13 +1,87 @@
 //@version=5
-strategy("TCL v1 – Base Structure", overlay=true, initial_capital=10000)
+strategy("TCL v1 — Structure + CHoCH (Step 1)", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.0)
 
-// === INPUTS ===
-risk_per_trade = input.float(1.0, "Risk % per Trade", step=0.1)
+//==============================
+// Inputs
+//==============================
+leftBars   = input.int(3,  "Swing Left Bars",  minval=1)
+rightBars  = input.int(3,  "Swing Right Bars", minval=1)
+useClose   = input.bool(true, "Break uses CLOSE (recommended for 1m-5m)")
+showSwings = input.bool(true, "Plot Swing Levels")
+showLabels = input.bool(true, "Show CHoCH Labels")
 
-// === PLACEHOLDER LOGIC ===
-// Hier bauen wir Schritt für Schritt:
-// CHoCH → Pullback → Entry → SL → TP
+//==============================
+// Swing detection (confirmed pivots)
+//==============================
+ph = ta.pivothigh(high, leftBars, rightBars)
+pl = ta.pivotlow(low,  leftBars, rightBars)
 
-// Debug Label
-if barstate.islast
-    label.new(bar_index, high, "TCL v1 ready", style=label.style_label_down)
+var float lastSwingHigh = na
+var int   lastSwingHighBar = na
+var float lastSwingLow  = na
+var int   lastSwingLowBar  = na
+
+if not na(ph)
+    lastSwingHigh := ph
+    lastSwingHighBar := bar_index - rightBars
+
+if not na(pl)
+    lastSwingLow := pl
+    lastSwingLowBar := bar_index - rightBars
+
+//==============================
+// Break logic (wick vs close)
+//==============================
+breakUp   = not na(lastSwingHigh) and (useClose ? close > lastSwingHigh : high > lastSwingHigh)
+breakDown = not na(lastSwingLow)  and (useClose ? close < lastSwingLow  : low  < lastSwingLow)
+
+//==============================
+// Trend state + CHoCH definition
+//==============================
+// trend:  1 = bullish, -1 = bearish, 0 = unknown
+var int trend = 0
+
+// CHoCH happens when price breaks opposite structure of current trend
+chochBull = (trend == -1) and breakUp
+chochBear = (trend ==  1) and breakDown
+
+// Initialize trend if unknown (first meaningful break)
+if trend == 0
+    if breakUp
+        trend := 1
+    else if breakDown
+        trend := -1
+
+// Update trend on CHoCH
+if chochBull
+    trend := 1
+if chochBear
+    trend := -1
+
+//==============================
+// Visuals
+//==============================
+if showSwings
+    // draw last swing levels as lines (update every bar)
+    var line hiLine = na
+    var line loLine = na
+
+    if barstate.isfirst
+        hiLine := line.new(bar_index, na, bar_index, na, extend=extend.right)
+        loLine := line.new(bar_index, na, bar_index, na, extend=extend.right)
+
+    line.set_xy1(hiLine, bar_index, lastSwingHigh)
+    line.set_xy2(hiLine, bar_index + 1, lastSwingHigh)
+
+    line.set_xy1(loLine, bar_index, lastSwingLow)
+    line.set_xy2(loLine, bar_index + 1, lastSwingLow)
+
+if showLabels and chochBull
+    label.new(bar_index, high, "CHoCH ↑", style=label.style_label_down, textcolor=color.white)
+if showLabels and chochBear
+    label.new(bar_index, low, "CHoCH ↓", style=label.style_label_up, textcolor=color.white)
+
+// Debug: show current trend
+plotchar(trend == 1, title="Trend Bull", char="▲", location=location.top)
+plotchar(trend == -1, title="Trend Bear", char="▼", location=location.bottom)
+
