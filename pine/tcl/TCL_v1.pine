@@ -1,0 +1,13 @@
+//@version=5
+strategy("TCL v1 – Base Structure", overlay=true, initial_capital=10000)
+
+// === INPUTS ===
+risk_per_trade = input.float(1.0, "Risk % per Trade", step=0.1)
+
+// === PLACEHOLDER LOGIC ===
+// Hier bauen wir Schritt für Schritt:
+// CHoCH → Pullback → Entry → SL → TP
+
+// Debug Label
+if barstate.islast
+    label.new(bar_index, high, "TCL v1 ready", style=label.style_label_down)
